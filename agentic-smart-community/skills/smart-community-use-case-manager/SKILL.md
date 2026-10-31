@@ -64,8 +64,8 @@ See **Question flow**, **Q1/Q2 decision block**, **Register (two steps)**.
 
 - `source_url` is known and the `use_case` is verified to exist (M0);
 - P1 and P2 were explicitly answered `P1=yes|no, P2=yes|no` in a later turn;
-- all required `target_classes` are complete (P1=yes), and P2=yes applies the
-  ROI template defaults from the reference;
+- the prefilter model and all required `target_classes` are complete (P1=yes),
+  and P2=yes applies the ROI template defaults from the reference;
 - the exact final `pipeline_config` was displayed (M3);
 - a still-later user turn said exactly `confirm pipeline_config`;
 - the config passed to the tool is identical to the approved one.
@@ -386,7 +386,8 @@ P2 — ROI focus: crop/focus a region of interest?
 Reply exactly: P1=yes|no, P2=yes|no
 ```
 
-Note that P1=yes later requires picking `target_classes`, and P2=yes applies
+Note that P1=yes later requires picking a model (when several are available)
+and its `target_classes`, and P2=yes applies
 the ROI template defaults (`mode: crop, expand: 0.25, auto_split_area: 0.35`;
 see the reference) with no further ROI questions. **End the turn immediately.**
 
@@ -401,11 +402,17 @@ ambiguous, ask only for the missing part and end the turn again.
 
 Continue only after an explicit `P1=.., P2=..` reply.
 
-* **P1=yes** — call `smart_community_monitor_ctl action=prefilter_options`, present
-  the returned `class_names` exactly, and have the user explicitly pick
-  `target_classes`. Do not select for the user; a recommendation is never a
-  selection; every pick must match a returned class name; handle `labels_source`
-  per the reference. Continue only after the user's explicit selection.
+* **P1=yes** — call `smart_community_monitor_ctl action=prefilter_options`.
+  Select a model from `models[]` before presenting its classes. Reuse an
+  explicitly named selectable model; otherwise, if several are selectable,
+  list them and wait for the user's explicit choice. If only one
+  is selectable, use it and state its name in M3. Never offer `rejected` models.
+  Then present the selected model's `class_names` exactly and have the user
+  explicitly pick `target_classes`. Do not select classes for the user; a
+  recommendation is never a selection. Every pick must match that model's
+  class names; handle `labels_source` per the reference.
+  Pass `prefilter.model=<name>`, never `model_path`, in `pipeline_config`.
+  Continue only after the required selections are complete.
 * **P2=yes** — apply the ROI template defaults from the reference verbatim
   (`roi: { enabled: true, mode: crop, expand: 0.25, auto_split_area: 0.35 }`).
   No further ROI questions; there is no geometry to collect (ROI is
@@ -421,7 +428,8 @@ Continue only after an explicit `P1=.., P2=..` reply.
 Only after all decisions/selections/parameters are complete:
 
 1. Assemble the exact `pipeline_config` for `register_source` and display it in
-   full — no hidden or summarized fields.
+   full — no hidden or summarized fields. Include the selected `prefilter.model`
+   when prefilter is enabled.
 2. Also display the decision summary (template in the reference).
 
 Even when both features are off, display an **explicit** disabled config
@@ -452,7 +460,7 @@ another part of the workflow does not satisfy this gate.
 
 Immediately before the call, verify the conversation contains, in order:
 (1) the P1/P2 question turn; (2) a later explicit P1/P2 answer; (3) any required
-`target_classes` selection; (4) the turn displaying the exact
+prefilter model and `target_classes` selection; (4) the turn displaying the exact
 `pipeline_config`; (5) a later explicit approval of that displayed config. If any
 item is absent, return to that state and do not call the tool. The config passed
 must be identical to the approved one — if any field must change, redisplay and
@@ -471,7 +479,7 @@ the approved `pipeline_config`. Never use `<use_case>_monitor` as the ID.
 
 ### Monitor gate failure handling
 
-Missing P1/P2 answer, target-class selection, or final approval:
+Missing P1/P2 answer, prefilter model or target-class selection, or final approval:
 stop and request exactly the missing item (redisplay the config for a missing
 approval). Config changed after approval: void it and repeat M3. Never bypass a
 gate by omitting `pipeline_config`, sending `{}`, relying on server defaults, or

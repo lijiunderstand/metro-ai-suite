@@ -54,12 +54,13 @@ semantics. Event-only changes never restart analytics or alter prefilter.
 
 Read effective monitor status and identify the scope; clarify multiple cameras
 only when unspecified. Extract every explicit supported field: enabled,
-target_classes, min_confidence, min_frames_hit, detect_fps, device, model_path,
+target_classes, min_confidence, min_frames_hit, detect_fps, device, model,
 long_side. Normalize explicit 65% confidence to 0.65. Preserve false and zero.
 No dedicated prompt/rule generation or VLM CRUD. Unsupported IoU/NMS fields
 must not be silently mapped or ignored. Validate confidence in 0..1, min_frames_hit as integer >=1, detect_fps >0,
 long_side as integer >=0, and enabled as boolean. Validate classes against the
-selected model and device/model_path against server constraints. Disabling
+selected model and device against server constraints. Select `model` from
+`prefilter_options`; never pass `model_path` in a pipeline patch. Disabling
 prefilter while ROI remains enabled is a dependency conflict: report it and
 resolve the separate ROI change through the original monitor gates; never
 silently change ROI.

@@ -35,9 +35,9 @@ Registering a use case is a short conversation with the agent, guarded by **mand
 
    Reply exactly `P1=yes|no, P2=yes|no`. If you answer `P1=no, P2=yes`, the agent warns that ROI has no trajectory source without prefilter and asks you to enable prefilter or drop ROI.
 
-6. **Pick the prefilter target classes (P1 = yes only).** The agent fetches the selectable classes from the deployed detection model (`smart_community_monitor_ctl action=prefilter_options`) and presents the returned class names verbatim for you to pick from — it never selects for you, and a name outside the model's list is rejected server-side at registration.
+6. **Pick the prefilter model and target classes (P1 = yes only).** The agent calls `smart_community_monitor_ctl action=prefilter_options`. If more than one prefilter model is registered, it lists them and waits for you to choose one — each monitor can use a different model; with a single model it uses that one and says so in the summary. It then presents the chosen model's class names verbatim for you to pick `target_classes` from. It never selects for you, and a name outside the model's list is rejected server-side at registration. To add models, see [Configure the Prefilter Model for a Monitor](./configure-prefilter-model.md).
 
-7. **Gate 4 — confirm the exact `pipeline_config`.** The agent assembles the full `pipeline_config` and displays it in full — no hidden or summarized fields — together with a human-readable decision summary (prefilter on/off, target classes, labels source, ROI on/off and its parameters, monitor ID, persistence). Even a deliberate "both off" is displayed as an explicit disabled config (`prefilter.enabled=false`, `roi.enabled=false`), so an intentional "off" stays distinguishable from "never configured". Only after a later message approves that exact config — reply `confirm pipeline_config` — does the agent call `smart_community_monitor_ctl action=register_source` (an upsert; a new monitor gets the default ID `cam_<use_case>`, `persist=true` mirrors it into `monitors.yaml`).
+7. **Gate 4 — confirm the exact `pipeline_config`.** The agent assembles the full `pipeline_config` and displays it in full — no hidden or summarized fields — together with a human-readable decision summary (prefilter on/off, prefilter model, target classes, labels source, ROI on/off and its parameters, monitor ID, persistence). Even a deliberate "both off" is displayed as an explicit disabled config (`prefilter.enabled=false`, `roi.enabled=false`), so an intentional "off" stays distinguishable from "never configured". Only after a later message approves that exact config — reply `confirm pipeline_config` — does the agent call `smart_community_monitor_ctl action=register_source` (an upsert; a new monitor gets the default ID `cam_<use_case>`, `persist=true` mirrors it into `monitors.yaml`).
 
 When registration finishes, the agent reports a **New Use Case** summary — use case, VLM task, mode, events/findings, final schema, rule path, report source, bound monitor, and validation status — plus a **Monitor Created** block when a monitor was bound (monitor ID, source URL, prefilter/ROI decisions, and the exact approved `pipeline_config`), followed by a grouped **System Inventory**: each registered use case (from `smart_community_use_case_register action=list`, which reads the server's live in-memory `use_case_dict`) with its bound monitors nested underneath (from `smart_community_monitor_ctl action=list`), so a use case with no camera yet shows up explicitly as `(no camera bound yet)` instead of disappearing from a monitors-only list — expected when you plan to supply the RTSP stream after registration. Once a monitor is bound, the use case is live immediately — alerts start flowing to any client subscribed to `smart-community://monitor/<monitor_id>/alerts`.
 
@@ -147,7 +147,9 @@ Here we enable both — prefilter keeps non-pet motion away from the VLM, and RO
 
 The same two monitor gates apply whenever a monitor is created, rebound, or updated — including binding a camera to a use case that was registered earlier.
 
-### Step 6 — Pick the prefilter target classes (P1 = yes)
+### Step 6 — Pick the prefilter model and target classes (P1 = yes)
+
+If several prefilter models are registered, choose one first; with a single model, OpenClaw uses it and shows its name.
 
 Because P1=yes, OpenClaw fetches the selectable classes from the deployed detection model (`smart_community_monitor_ctl action=prefilter_options`) and presents them verbatim. The `labels_source: embedded` flag means the list is authoritative — it came from the model itself, and a class outside the list is rejected server-side at registration. For a home pet camera the relevant animal classes are `cat` and `dog` (the model's COCO-80 label set has no general "pet" class); OpenClaw suggests the safe pick for a typical pet household, but never chooses for you:
 
@@ -167,6 +169,7 @@ With every decision collected, OpenClaw assembles the exact `pipeline_config` th
 pipeline_config:
   prefilter:
     enabled: true
+    model: yolo11s
     target_classes: [cat, dog]
   roi:
     enabled: true
